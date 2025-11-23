@@ -3,7 +3,6 @@ from typing import List, Literal, Optional
 from pydantic import BaseModel, Field, field_validator
 
 DecisionID = Literal[
-    "generate_summary",
     "reset_vpn_profile",
     "restart_sso_session",
     "run_connectivity_diagnostics",
@@ -11,6 +10,32 @@ DecisionID = Literal[
     "send_notification",
     "approval_required",
 ]
+
+DECISION_TRIGGERS = {
+    "reset_vpn_profile": (
+        "Triggered by repeated VPN disconnects, corrupted profiles, or authentication failures."
+    ),
+    "restart_sso_session": (
+        "Triggered by expired sessions, login loops, or token-related issues."
+    ),
+    "run_connectivity_diagnostics": (
+        "Triggered by network failures, unreachable services, or packet loss indications."
+    ),
+    "update_internal_record": (
+        "Triggered by status changes, onboarding/offboarding events, or asset updates."
+    ),
+    "send_notification": (
+        "Triggered when escalation, alerting, or user communication is required."
+    ),
+    "approval_required": (
+        "Triggered when policies, compliance conditions, elevated access, or exceptions apply."
+    ),
+}
+
+
+class DecisionContext(BaseModel):
+    decision_id: DecisionID
+    context: str
 
 
 class DecisionOutput(BaseModel):
@@ -33,13 +58,13 @@ class DecisionOutput(BaseModel):
 
 class CombinedPlan(BaseModel):
     # Decision flags
-    generate_summary: bool = False
     reset_vpn_profile: bool = False
     restart_sso_session: bool = False
     run_connectivity_diagnostics: bool = False
     update_internal_record: bool = False
     send_notification: bool = False
     approval_required: bool = False
+    generated_summary: str | None = ''
 
     # Aggregated metadata
     confidence: float = Field(0.0, ge=0.0, le=1.0)
@@ -51,6 +76,7 @@ class CombinedPlan(BaseModel):
             evals: List[DecisionOutput],
             conf_threshold: float = 0.6,
             summary_notes: Optional[str] = None,
+            additional_summary: Optional[str] = None
     ) -> "CombinedPlan":
         """
         Deterministic combiner:
@@ -61,7 +87,6 @@ class CombinedPlan(BaseModel):
         - notes = summary_notes (combiner LLM or deterministic concat).
         """
         keys = {
-            "generate_summary",
             "reset_vpn_profile",
             "restart_sso_session",
             "run_connectivity_diagnostics",
@@ -79,9 +104,8 @@ class CombinedPlan(BaseModel):
                 true_confidences.append(d.confidence)
 
         overall_conf = round(max(true_confidences) if true_confidences else 0.0, 3)
-
         return cls(
-            generate_summary=mapping["generate_summary"],
+            generated_summary=additional_summary if additional_summary else '',
             reset_vpn_profile=mapping["reset_vpn_profile"],
             restart_sso_session=mapping["restart_sso_session"],
             run_connectivity_diagnostics=mapping["run_connectivity_diagnostics"],
@@ -115,5 +139,6 @@ if __name__ == "__main__":
     ]
 
     plan = CombinedPlan.assemble_from_evaluators(examples, conf_threshold=0.6,
-                                                 summary_notes="Reset VPN recommended; SSO ambiguous.")
+                                                 summary_notes="Reset VPN recommended; SSO ambiguous.",
+                                                 additional_summary='additional_summary')
     print(plan.model_dump_json(indent=2))

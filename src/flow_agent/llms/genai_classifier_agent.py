@@ -5,13 +5,21 @@ from google.genai import types
 from google.genai.chats import AsyncChat
 from google.genai.client import AsyncClient
 
-MODEL_DEFAULT = "gemini-2.5-flash-lite"
+MODEL_DEFAULT = "gemini-2.5-flash"
+SUMMARIZER_MODEL_DEFAULT = "gemini-2.5-flash-lite"
 _lock = Lock()
 _genai_chat: AsyncChat | None = None
 _llm_client: AsyncClient | None = None
 
 _GENAI_PROMPT = """
 You are a helpful agent.
+"""
+
+_GENAI_SUMMARIZER_PROMPT = """
+You are a helpful summarizer agent.
+whatever text passed to you please create a concrete summary where no specific 
+events or events description, dates, numbers are missed.
+what can be summarized maximum  are emotions, greetings, lengthy descriptions.
 """
 
 # Define safety settings for ALL categories
@@ -59,6 +67,22 @@ async def get_combiner_agent() -> AsyncChat:
                     model=MODEL_DEFAULT,
                     config=types.GenerateContentConfig(
                         system_instruction=_GENAI_PROMPT,
+                        safety_settings=_safety_settings
+                    )
+                )
+    return _genai_chat
+
+
+async def get_summarizer_agent() -> AsyncChat:
+    global _genai_chat
+    _create_client()
+    if _genai_chat is None:
+        with _lock:
+            if _genai_chat is None:
+                _genai_chat = _llm_client.chats.create(
+                    model=SUMMARIZER_MODEL_DEFAULT,
+                    config=types.GenerateContentConfig(
+                        system_instruction=_GENAI_SUMMARIZER_PROMPT,
                         safety_settings=_safety_settings
                     )
                 )
