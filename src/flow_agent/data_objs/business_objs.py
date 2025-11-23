@@ -34,7 +34,7 @@ DECISION_TRIGGERS = {
 
 
 class DecisionContext(BaseModel):
-    decision_id: DecisionID
+    decision_id: str
     context: str
 
 
@@ -102,6 +102,7 @@ class CombinedPlan(BaseModel):
             if d.decision and d.confidence >= conf_threshold:
                 mapping[d.decision_id] = True
                 true_confidences.append(d.confidence)
+                summary_notes = (summary_notes or "") + (d.notes or "")
 
         overall_conf = round(max(true_confidences) if true_confidences else 0.0, 3)
         return cls(

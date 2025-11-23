@@ -19,6 +19,7 @@ _GENAI_SUMMARIZER_PROMPT = """
 You are a helpful summarizer agent.
 whatever text passed to you please create a concrete summary where no specific 
 events or events description, dates, numbers are missed.
+Priorities are always assigned on issue not on user.
 what can be summarized maximum  are emotions, greetings, lengthy descriptions.
 """
 
@@ -55,22 +56,6 @@ def _create_client():
             if _llm_client is None:
                 _llm_client = genai.Client().aio
     return _llm_client
-
-
-async def get_combiner_agent() -> AsyncChat:
-    global _genai_chat
-    _create_client()
-    if _genai_chat is None:
-        with _lock:
-            if _genai_chat is None:
-                _genai_chat = _llm_client.chats.create(
-                    model=MODEL_DEFAULT,
-                    config=types.GenerateContentConfig(
-                        system_instruction=_GENAI_PROMPT,
-                        safety_settings=_safety_settings
-                    )
-                )
-    return _genai_chat
 
 
 async def get_summarizer_agent() -> AsyncChat:
