@@ -19,7 +19,7 @@ This design enables scalable execution while ensuring deterministic aggregation 
 ### ✅ Summarizer (Global Context Builder)
 
 * Node: `summarizer`
-* Model: **gpt‑2.5‑flash‑lite**
+* Model: **gemini-2.5-flash-lite**
 * Responsibilities:
 
   * interpret raw issue input
