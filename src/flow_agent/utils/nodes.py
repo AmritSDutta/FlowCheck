@@ -6,7 +6,7 @@ from google.genai.chats import AsyncChat
 from langchain_core.messages import AIMessage, BaseMessage, convert_to_messages, get_buffer_string
 from langgraph.constants import END
 from langgraph.runtime import Runtime
-from langgraph.types import Command, Send
+from langgraph.types import Command, Send, interrupt
 from langgraph_api.schema import Context
 
 from src.flow_agent.data_objs.business_objs import DecisionOutput, CombinedPlan, DecisionID, DecisionContext
@@ -38,7 +38,7 @@ async def call_summarizer_model(state: State, runtime: Runtime[Context]) -> Comm
     return Command(update={
         "issue": summary,
         "messages": genai_res,
-        'sub_issues_decision':  get_args(DecisionID),
+        'sub_issues_decision': get_args(DecisionID),
         'completed_sub_issues_decision': [],
     }, goto='combiner')
 
@@ -73,6 +73,11 @@ async def call_subtask_model(state: State, runtime: Runtime[Context]):
 
     sub_issue: str = state["sub_issue"]
     logging.info(f'executing {sub_issue}')
+    if sub_issue == "approval_required":
+        approval: str = interrupt('is approved ?')
+        return {
+            "completed_sub_issues_decision": [DecisionOutput(decision_id=sub_issue, decision=False, confidence=1.0)]
+        }
 
     agent = await get_sub_task_agent_instance()
     decision_ctx = DecisionContext(
@@ -85,6 +90,7 @@ async def call_subtask_model(state: State, runtime: Runtime[Context]):
         input=f"Evaluate decision_id={sub_issue} for issue: {state['issue']}",
         context=decision_ctx,
     )
+
     output_dump = result.final_output.model_dump_json(indent=2)
     logging.info(f'post execution- {sub_issue}, decision : {output_dump}')
     return {

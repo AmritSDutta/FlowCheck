@@ -42,7 +42,7 @@ class DecisionOutput(BaseModel):
     decision_id: DecisionID
     decision: bool
     confidence: float = Field(..., ge=0.0, le=1.0)
-    model: str
+    model: Optional[str] = 'default'
     notes: Optional[str] = None
     latency_ms: Optional[int] = Field(None, ge=0)
 
@@ -75,7 +75,7 @@ class CombinedPlan(BaseModel):
             cls,
             evals: List[DecisionOutput],
             conf_threshold: float = 0.6,
-            summary_notes: Optional[str] = None,
+            summary_notes: Optional[str] = "",
             additional_summary: Optional[str] = None
     ) -> "CombinedPlan":
         """
@@ -102,7 +102,7 @@ class CombinedPlan(BaseModel):
             if d.decision and d.confidence >= conf_threshold:
                 mapping[d.decision_id] = True
                 true_confidences.append(d.confidence)
-                summary_notes = (summary_notes or "") + (d.notes or "")
+                summary_notes = ((summary_notes or "") + (d.notes or "") + "\n\n")
 
         overall_conf = round(max(true_confidences) if true_confidences else 0.0, 3)
         return cls(
