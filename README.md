@@ -155,6 +155,54 @@ Do **not** use if:
 ❌ ordering impacts evaluation
 
 ---
+# FlowCheck UI (Streamlit Client)
+
+A lightweight UI for interacting with the FlowCheck LangGraph deployment over REST. It supports large incident input, run execution, polling run status, and displaying the final `final_report` from thread state.
+
+## Requirements
+```bash
+pip install streamlit requests
+```
+
+## Configuration
+Edit at top of `app.py`:
+```python
+DEPLOYMENT_URL = "http://localhost:2024"
+ASSISTANT_ID = "agent"
+```
+
+## Run
+```bash
+python -m streamlit run app.py
+```
+
+Open in browser:
+```
+http://localhost:8501
+```
+
+## Features
+- Large text issue input
+- Sends request to LangGraph deployment
+- Shows compact “running” status
+- Fetches thread state after success
+- Displays formatted `final_report`
+
+## Troubleshooting
+| Issue | Fix |
+|-------|-----|
+| 422 on thread create | Add `json={}` body |
+| No final report | Read from thread, not run |
+| Connection failure | Check deployment URL & server |
+
+## Optional Enhancements
+- Show node transitions
+- Export report file
+- Use new thread per run
+- Add auth headers
+
+
+
 
 ## License
 
