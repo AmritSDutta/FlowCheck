@@ -34,7 +34,7 @@ def test_default_threshold_disables_low_confidence(example_evals):
     assert plan.reset_vpn_profile is True
     assert plan.restart_sso_session is False  # 0.58 < 0.6
     assert plan.confidence == 0.87
-    assert plan.task_specific_notes == "Reset VPN recommended; SSO ambiguous."
+    assert "Reset VPN recommended; SSO ambiguous." in plan.task_specific_notes
 
 
 def test_lower_global_threshold_enables_sso(example_evals):

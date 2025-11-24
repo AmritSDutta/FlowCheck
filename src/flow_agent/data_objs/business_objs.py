@@ -66,7 +66,7 @@ class CombinedPlan(BaseModel):
     send_notification: bool = False
     approval_required: bool = False
     generated_summary: str | None = ''
-    thread_identifier: str = None
+    thread_identifier: Optional[str] = None
 
     # Aggregated metadata
     confidence: float = Field(0.0, ge=0.0, le=1.0)
@@ -122,7 +122,7 @@ class CombinedPlan(BaseModel):
             approval_required=mapping["approval_required"],
             confidence=overall_conf,
             task_specific_notes=summary_notes,
-            thread_identifier=_thread_identifier
+            thread_identifier=_thread_identifier if _thread_identifier else None
         )
 
 
