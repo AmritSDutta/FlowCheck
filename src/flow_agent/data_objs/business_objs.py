@@ -70,14 +70,14 @@ class CombinedPlan(BaseModel):
 
     # Aggregated metadata
     confidence: float = Field(0.0, ge=0.0, le=1.0)
-    notes: Optional[str] = None
+    task_specific_notes: Optional[list[str]] = []
 
     @classmethod
     def assemble_from_evaluators(
             cls,
             evals: List[DecisionOutput],
             conf_threshold: float = 0.6,
-            summary_notes: Optional[str] = "",
+            summary_notes: Optional[list[str]] = None,
             additional_summary: Optional[str] = None
     ) -> "CombinedPlan":
         """
@@ -88,6 +88,10 @@ class CombinedPlan(BaseModel):
         - confidence = max(confidence of enabled decisions) or 0.0.
         - notes = summary_notes (combiner LLM or deterministic concat).
         """
+        summary_notes = list(summary_notes or [])  # make a fresh list
+
+        if summary_notes is None:
+            summary_notes = []
         keys = {
             "reset_vpn_profile",
             "restart_sso_session",
@@ -104,7 +108,7 @@ class CombinedPlan(BaseModel):
             if d.decision and d.confidence >= conf_threshold:
                 mapping[d.decision_id] = True
                 true_confidences.append(d.confidence)
-                summary_notes = ((summary_notes or "") + "  [" + d.decision_id + "]  " + (d.notes or ""))
+                summary_notes.append(f"[{d.decision_id}] {d.notes or ''}".strip())
                 _thread_identifier = d.thread_identifier
 
         overall_conf = round(max(true_confidences) if true_confidences else 0.0, 3)
@@ -117,7 +121,7 @@ class CombinedPlan(BaseModel):
             send_notification=mapping["send_notification"],
             approval_required=mapping["approval_required"],
             confidence=overall_conf,
-            notes=summary_notes,
+            task_specific_notes=summary_notes,
             thread_identifier=_thread_identifier
         )
 
@@ -130,7 +134,7 @@ if __name__ == "__main__":
             decision=True,
             confidence=0.87,
             model="gpt-5-mini-v1",
-            notes="Detected repeated VPN disconnects",
+            notes=["Detected repeated VPN disconnects"],
             latency_ms=320,
         ),
         DecisionOutput(
@@ -138,12 +142,12 @@ if __name__ == "__main__":
             decision=True,
             confidence=0.58,
             model="gpt-5-mini-v1",
-            notes="SSO token refresh errors ambiguous",
+            notes=["SSO token refresh errors ambiguous"],
             latency_ms=280,
         ),
     ]
 
     plan = CombinedPlan.assemble_from_evaluators(examples, conf_threshold=0.6,
-                                                 summary_notes="Reset VPN recommended; SSO ambiguous.",
+                                                 summary_notes=["Reset VPN recommended; SSO ambiguous."],
                                                  additional_summary='additional_summary')
     print(plan.model_dump_json(indent=2))

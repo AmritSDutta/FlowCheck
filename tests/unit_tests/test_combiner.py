@@ -29,17 +29,17 @@ def example_evals():
 
 def test_default_threshold_disables_low_confidence(example_evals):
     plan = CombinedPlan.assemble_from_evaluators(
-        example_evals, conf_threshold=0.6, summary_notes="Reset VPN recommended; SSO ambiguous."
+        example_evals, conf_threshold=0.6, summary_notes=["Reset VPN recommended; SSO ambiguous."]
     )
     assert plan.reset_vpn_profile is True
     assert plan.restart_sso_session is False  # 0.58 < 0.6
     assert plan.confidence == 0.87
-    assert plan.notes == "Reset VPN recommended; SSO ambiguous."
+    assert plan.task_specific_notes == "Reset VPN recommended; SSO ambiguous."
 
 
 def test_lower_global_threshold_enables_sso(example_evals):
     plan = CombinedPlan.assemble_from_evaluators(
-        example_evals, conf_threshold=0.5, summary_notes="Lower threshold test"
+        example_evals, conf_threshold=0.5, summary_notes=["Lower threshold test"]
     )
     assert plan.reset_vpn_profile is True
     assert plan.restart_sso_session is True  # 0.58 >= 0.5
@@ -50,7 +50,7 @@ def test_per_decision_threshold_enables_sso_only(example_evals):
     plan = CombinedPlan.assemble_from_evaluators(
         example_evals,
         conf_threshold=0.5,
-        summary_notes="Per-decision threshold test"
+        summary_notes=["Per-decision threshold test"]
     )
     assert plan.reset_vpn_profile is True
     assert plan.restart_sso_session is True  # per-decision threshold 0.55 allows 0.58

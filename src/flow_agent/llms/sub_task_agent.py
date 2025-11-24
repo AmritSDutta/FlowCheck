@@ -29,7 +29,7 @@ def dynamic_instructions(
        - decision: true if action is warranted, false otherwise
        - confidence: 0.0–1.0 expressing certainty
        - model: name of the model producing the output
-       - notes: concise reasoning (optional)
+       - notes: concise reasoning (optional) , must be maximum 10 words.
        - latency_ms: leave empty
     
     Output JSON strictly in the following structure:
@@ -42,7 +42,7 @@ def dynamic_instructions(
       "notes": "short rationale",
       "latency_ms": null
     }}
-
+    optimize output token usage without compromising on quality of output.
     Help them with their questions.
     """
 

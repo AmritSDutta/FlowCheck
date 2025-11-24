@@ -55,7 +55,7 @@ async def call_combiner_model(state: State, runtime: Runtime[Context]) -> Comman
     if not final_output:
         return Command(update={"messages": state["messages"]}, goto=END)
 
-    output_dump = final_output.model_dump_json(indent=2)
+    output_dump = final_output.model_dump_json(indent=4)
     logging.info(output_dump)
 
     return Command(update={
@@ -102,8 +102,10 @@ async def call_subtask_model(state: State, runtime: Runtime[Context]):
         context=decision_ctx,
     )
 
-    output_dump = result.final_output.model_dump_json(indent=2)
-    logging.info(f'[Sub-task] {sub_issue}, decision : {output_dump[:150]}')
+    logging.info(f'[subtask] {sub_issue}: input token- {result.context_wrapper.usage.input_tokens},'
+                 f'output token- {result.context_wrapper.usage.output_tokens}')
+    output_dump = result.final_output.model_dump_json(indent=4)
+    logging.info(f'[Sub-task] {sub_issue}: {output_dump[:150]}')
     return {
         "messages": AIMessage(f'f"Evaluated needs : {sub_issue}'),
         "completed_sub_issues_decision": [result.final_output]
