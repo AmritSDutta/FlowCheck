@@ -76,6 +76,7 @@ async def call_subtask_model(state: State, runtime: Runtime[Context]):
     sub_issue: str = state["sub_issue"]
     logging.info(f'[Sub-task] {sub_issue} executing ... ')
 
+    """
     if sub_issue == "approval_required":
         approval: bool = _interrupt_bool()
         return {
@@ -88,6 +89,7 @@ async def call_subtask_model(state: State, runtime: Runtime[Context]):
                 )
             ]
         }
+    """
 
     agent = await get_sub_task_agent_instance()
     decision_ctx = DecisionContext(
