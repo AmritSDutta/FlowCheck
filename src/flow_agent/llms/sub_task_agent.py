@@ -2,7 +2,7 @@ from asyncio import Lock
 
 from agents import Agent, RunContextWrapper
 
-from src.flow_agent.data_objs.business_objs import DecisionContext, DecisionOutput, DECISION_TRIGGERS, CombinedPlan
+from src.flow_agent.data_objs.business_objs import DecisionContext, DecisionOutput, DECISION_TRIGGERS
 
 _combiner_agent_instance = None
 _auditor_agent_instance = None

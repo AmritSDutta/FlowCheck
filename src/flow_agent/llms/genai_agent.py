@@ -1,5 +1,3 @@
-from threading import Lock
-
 from google import genai
 from google.genai import types
 from google.genai.chats import AsyncChat
