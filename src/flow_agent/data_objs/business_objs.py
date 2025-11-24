@@ -45,6 +45,7 @@ class DecisionOutput(BaseModel):
     model: Optional[str] = 'default'
     notes: Optional[str] = None
     latency_ms: Optional[int] = Field(None, ge=0)
+    thread_identifier: str = None
 
     # Normalize/round confidence at validation time
     @field_validator("confidence", mode="before")
@@ -65,6 +66,7 @@ class CombinedPlan(BaseModel):
     send_notification: bool = False
     approval_required: bool = False
     generated_summary: str | None = ''
+    thread_identifier: str = None
 
     # Aggregated metadata
     confidence: float = Field(0.0, ge=0.0, le=1.0)
@@ -97,12 +99,13 @@ class CombinedPlan(BaseModel):
 
         mapping = {k: False for k in keys}
         true_confidences: List[float] = []
-
+        _thread_identifier = ''
         for d in evals:
             if d.decision and d.confidence >= conf_threshold:
                 mapping[d.decision_id] = True
                 true_confidences.append(d.confidence)
-                summary_notes = ((summary_notes or "") + (d.notes or "") + "\n\n")
+                summary_notes = ((summary_notes or "") + "  [" + d.decision_id + "]  " + (d.notes or ""))
+                _thread_identifier = d.thread_identifier
 
         overall_conf = round(max(true_confidences) if true_confidences else 0.0, 3)
         return cls(
@@ -115,6 +118,7 @@ class CombinedPlan(BaseModel):
             approval_required=mapping["approval_required"],
             confidence=overall_conf,
             notes=summary_notes,
+            thread_identifier=_thread_identifier
         )
 
 

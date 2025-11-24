@@ -4,6 +4,7 @@ from typing import get_args
 from agents import Runner
 from google.genai.chats import AsyncChat
 from langchain_core.messages import AIMessage, BaseMessage, convert_to_messages, get_buffer_string
+from langgraph.config import get_config
 from langgraph.constants import END
 from langgraph.runtime import Runtime
 from langgraph.types import Command, Send, interrupt
@@ -25,14 +26,14 @@ async def call_summarizer_model(state: State, runtime: Runtime[Context]) -> Comm
         return Command(update={"retry_count": state["retry_count"], "messages": state["messages"]}, goto=END)
 
     agent: AsyncChat = await get_summarizer_agent()
-    logging.info(f'user requirement: {gbt}')
+    logging.info(f'user requirement: {gbt[:100]}')
     response = await agent.send_message(gbt)
     summary: str | None = 'not available'
     genai_res: AIMessage | None = AIMessage('did nto get it, please re ask.')
     if response and response.text:
-        logging.info(f'Agent summarization response: {response.text}')
+        logging.info(f'Agent summarization response: {response.text[:100]}')
         logging.info(f'Agent token usage: {response.usage_metadata.total_token_count}')
-        genai_res = AIMessage(response.text)
+        genai_res = AIMessage(f'Issue summary: {response.text}')
         summary = response.text
 
     return Command(update={
@@ -59,31 +60,39 @@ async def call_combiner_model(state: State, runtime: Runtime[Context]) -> Comman
 
     return Command(update={
         "final_report": final_output,
-        "messages": AIMessage(output_dump)
+        "messages": AIMessage(f'Final resolution: {output_dump}')
     }, goto=END)
 
 
 async def call_subtask_model(state: State, runtime: Runtime[Context]):
-    """Worker writes a section of the report"""
-
     """
+       This will be called for each decision type needed.
        Worker: evaluate a single decision_id and append DecisionOutput.
        Expects state["decision_id"] injected via Send().
-       """
+    """
+    cfg = get_config()
+    _thread_id = cfg.get("configurable", {}).get("thread_id", '')
 
     sub_issue: str = state["sub_issue"]
-    logging.info(f'executing {sub_issue}')
+    logging.info(f'[Sub-task] {sub_issue} executing ... ')
+
     if sub_issue == "approval_required":
-        approval: str = interrupt('is approved ?')
+        approval: bool = _interrupt_bool()
         return {
-            "completed_sub_issues_decision": [DecisionOutput(decision_id=sub_issue, decision=False, confidence=1.0)]
+            "completed_sub_issues_decision": [
+                DecisionOutput(
+                    decision_id=sub_issue,
+                    decision=approval,
+                    confidence=1.0,
+                    thread_identifier=_thread_id
+                )
+            ]
         }
 
     agent = await get_sub_task_agent_instance()
     decision_ctx = DecisionContext(
         context=state["issue"],
         decision_id=sub_issue,
-        # add any other DecisionContext fields you have
     )
     result = await Runner.run(
         starting_agent=agent,
@@ -92,21 +101,37 @@ async def call_subtask_model(state: State, runtime: Runtime[Context]):
     )
 
     output_dump = result.final_output.model_dump_json(indent=2)
-    logging.info(f'post execution- {sub_issue}, decision : {output_dump}')
+    logging.info(f'[Sub-task] {sub_issue}, decision : {output_dump[:150]}')
     return {
+        "messages": AIMessage(f'f"Evaluated needs : {sub_issue}'),
         "completed_sub_issues_decision": [result.final_output]
     }
 
 
 async def assign_workers(state: State, runtime: Runtime[Context]):
-    """Assign a worker to each section in the plan"""
+    """Assign a worker to each type of decision"""
     sub_issues = state["sub_issues_decision"]
 
     if not sub_issues:
-        # no work → skip directly to combiner
         return "combiner"
 
     return [
         Send("subtask", {**state, "sub_issue": s})
         for s in sub_issues
     ]
+
+
+def _interrupt_bool(prompt: str = "is issue required elevated approval ?") -> bool:
+    value = interrupt(prompt)
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"true", "yes", "y", "1"}:
+            return True
+        if lowered in {"false", "no", "n", "0"}:
+            return False
+    if isinstance(value, (int, float)):
+        return bool(value)
+
+    raise ValueError(f"Invalid approval value from interrupt: {value!r}")
