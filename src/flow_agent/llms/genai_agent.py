@@ -7,9 +7,6 @@ from google.genai.client import AsyncClient
 
 MODEL_DEFAULT = "gemini-2.5-flash"
 SUMMARIZER_MODEL_DEFAULT = "gemini-2.5-flash-lite"
-_lock = Lock()
-_genai_chat: AsyncChat | None = None
-_llm_client: AsyncClient | None = None
 
 _GENAI_PROMPT = """
 You are a helpful agent.
@@ -49,26 +46,16 @@ _safety_settings = [
 
 
 # ---------- Gemini chat singletons ----------
-def _create_client():
-    global _llm_client
-    if _llm_client is None:
-        with _lock:
-            if _llm_client is None:
-                _llm_client = genai.Client().aio
-    return _llm_client
+def _create_client() -> AsyncClient:
+    return genai.Client().aio
 
 
 async def get_summarizer_agent() -> AsyncChat:
-    global _genai_chat
-    _create_client()
-    if _genai_chat is None:
-        with _lock:
-            if _genai_chat is None:
-                _genai_chat = _llm_client.chats.create(
+    _llm_client: AsyncClient = _create_client()
+    return _llm_client.chats.create(
                     model=SUMMARIZER_MODEL_DEFAULT,
                     config=types.GenerateContentConfig(
                         system_instruction=_GENAI_SUMMARIZER_PROMPT,
                         safety_settings=_safety_settings
                     )
                 )
-    return _genai_chat

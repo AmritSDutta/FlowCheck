@@ -16,6 +16,22 @@ from src.flow_agent.llms.sub_task_agent import get_sub_task_agent_instance
 from src.flow_agent.utils.state import State
 
 
+async def entry_node(state: State):
+    if state.get("ended_once"):
+        # Mark as closed
+        return {"ended_once": True, "messages": AIMessage('Use another thread for run. It is already ended')}
+    return state
+
+
+async def should_continue(state: State):
+    """Conditional edge: check if closed"""
+    if state.get("ended_once"):
+        logging.info("Thread already closed, skipping execution")
+        return END
+
+    return "summarizer"  # Normal flow
+
+
 async def call_summarizer_model(state: State, runtime: Runtime[Context]) -> Command:
     user_message: list[BaseMessage] = state.get("messages")
     ctm = convert_to_messages(user_message)
@@ -50,6 +66,9 @@ async def call_combiner_model(state: State, runtime: Runtime[Context]) -> Comman
     final_output: CombinedPlan = (CombinedPlan
                                   .assemble_from_evaluators(decisions,
                                                             additional_summary=issue_summary if issue_summary else ''))
+    cfg = get_config()
+    _thread_id = cfg.get("configurable", {}).get("thread_id", '')
+    final_output.thread_identifier = _thread_id
     logging.info(final_output)
 
     if not final_output:
@@ -59,8 +78,9 @@ async def call_combiner_model(state: State, runtime: Runtime[Context]) -> Comman
     logging.info(output_dump)
 
     return Command(update={
+        "ended_once": True,
         "final_report": final_output,
-        "messages": AIMessage(f'Final resolution: {output_dump}')
+        "messages": AIMessage(f'{output_dump}')
     }, goto=END)
 
 

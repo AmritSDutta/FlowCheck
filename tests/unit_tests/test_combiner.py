@@ -71,22 +71,3 @@ def test_no_decisions_above_threshold_returns_confidence_zero():
     plan = CombinedPlan.assemble_from_evaluators(low_conf_evals, conf_threshold=0.5)
     assert plan.reset_vpn_profile is False
     assert plan.confidence == 0.0
-
-
-"""
-subject: repeated VPN disconnects and SSO failures.
-
-Hi team,
-
-Please take a look at this — ticket INC-448291 has been getting worse.  
-User is really frustrated at this point. They’re on priority P3, but the impact is growing.
-
-Full description:  
-Over the last 24 hours, their VPN drops almost every hour. On top of that, the SSO token refresh keeps failing, 
-which means they can’t log into Jira or Confluence at all. They’re basically blocked from doing any internal work. 
-They’ve attached logs from today hoping it helps (log_2025_11_20.zip).
-
-Requested action from the user: *“Please stabilize my access — I can’t keep getting kicked out like this.”*
-Feels like this might need a VPN profile reset + SSO session restart, but I’ll leave it to the automation to decide.
-Thanks.
-"""

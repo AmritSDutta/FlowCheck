@@ -17,3 +17,4 @@ class State(TypedDict):
         list, operator.add
     ]
     final_report: CombinedPlan
+    ended_once: bool
