@@ -14,17 +14,17 @@ def dynamic_instructions(
         context: RunContextWrapper[DecisionContext], agent: Agent[DecisionContext]
 ) -> str:
     return f"""
-    as a agent of {{context.context.decision_id}}. 
+    as a agent of {context.context.decision_id}. 
     You are an automated decision evaluator.
 
     Input:
-    - decision_id: {{context.context.decision_id}}
+    - decision_id: {context.context.decision_id}
     - context: unstructured text containing events, logs, symptoms, actions, or user reports.
     
     Task:
     1. Read and interpret the context.
     2. Based solely on the meaning of the decision_id, determine if action is required:
-       - {{DECISION_TRIGGERS.get(context.context.decision_id)}}
+       - {DECISION_TRIGGERS.get(context.context.decision_id)}
     3. Return:
        - decision: true if action is warranted, false otherwise
        - confidence: 0.0–1.0 expressing certainty
