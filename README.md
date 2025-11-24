@@ -120,6 +120,68 @@ END
 ✅ Null fields like `notes` must be normalized
 
 ---
+## 🔍 Example: Dynamic Evaluator Prompt (run_connectivity_diagnostics)
+
+Each evaluator receives a dynamically constructed prompt based on its `decision_id`.  
+Below is an example of the **actual prompt** used for the `run_connectivity_diagnostics` evaluator.
+
+### **Evaluator Prompt (Auto-Generated)**
+
+```
+as a agent of run_connectivity_diagnostics. 
+You are an automated decision evaluator.
+
+Input:
+- decision_id: run_connectivity_diagnostics
+- context: unstructured text containing events, logs, symptoms, actions, or user reports.
+
+Task:
+1. Read and interpret the context.
+2. Based solely on the meaning of the decision_id, determine if action is required:
+   - Triggered by network failures, unreachable services, or packet loss indications.
+3. Return:
+   - decision: true if action is warranted, false otherwise
+   - confidence: 0.0–1.0 expressing certainty
+   - model: name of the model producing the output
+   - notes: concise reasoning (optional) , must be maximum 10 words.
+   - latency_ms: leave empty
+
+Output JSON strictly in the following structure:
+
+{
+  "decision_id": "run_connectivity_diagnostics",
+  "decision": true or false,
+  "confidence": 0.0,
+  "model": "gpt-5-nano",
+  "notes": "short rationale",
+  "latency_ms": null
+}
+optimize output token usage without compromising on quality of output.
+Help them with their questions.
+```
+
+---
+
+### **Sample Output**
+
+```json
+{
+  "decision_id": "run_connectivity_diagnostics",
+  "decision": true,
+  "confidence": 0.81,
+  "model": "gpt-5-nano",
+  "notes": "Latency spikes and packet loss reported",
+  "latency_ms": null
+}
+```
+### Notes
+
+- Every evaluator follows the same structure; only decision_id, decision logic description, and sample schema differ.
+- Prompts remain short to minimize cost while preserving clarity.
+---
+
+The executor uses these outputs to assemble the final CombinedPlan.
+---
 
 ## Model Selection Rationale
 
