@@ -9,6 +9,8 @@ from langchain_core.messages import HumanMessage, AIMessage
 from src.flow_agent.data_objs.business_objs import CombinedPlan
 from src.flow_agent.graph import graph as raw_graph
 
+pytestmark = pytest.mark.skip(reason="E2E Google GenAI tests disabled in CI")
+
 MESSAGE_1 = """
 Incident Notification #2345: Incident Notification
 To Whom It May Concern,
@@ -40,6 +42,7 @@ Thanks.
 """
 
 
+# @pytest.mark.skip(reason="Requires Google GenAI credentials")
 @pytest.mark.asyncio(loop_scope="session")
 async def test_graph_1():
     test_graph = raw_graph.compile()
@@ -73,6 +76,7 @@ async def test_graph_1():
         pytest.fail("AIMessage not emitted")
 
 
+# @pytest.mark.skip(reason="Requires Google GenAI credentials")
 @pytest.mark.asyncio(loop_scope="session")
 async def test_graph_2():
     test_graph = raw_graph.compile()
