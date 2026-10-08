@@ -1,271 +1,158 @@
 # FlowCheck
 
-# Using Orchestrator–Worker Architecture
+> Parallel incident evaluation and decision automation using **LangGraph** with an **orchestrator–worker fan-out/fan-in architecture**.
 
-## Overview
-
-FlowCheck implements a parallel evaluation pipeline for decision automation using **LangGraph** with an **orchestrator–worker fan‑out/fan‑in pattern**. The system:
-
-1. Extracts and summarizes input context
-2. Dispatches parallel decision evaluators
-3. Aggregates all outputs into a unified final report
-
-This design enables scalable execution while ensuring deterministic aggregation of results.
+FlowCheck ingests unstructured incident alerts, logs, and issue descriptions, summarizes the incident context using **Google Gemini**, evaluates independent operational actions in parallel using **OpenAI Agents**, and deterministically aggregates outcomes into a structured, unified action plan.
 
 ---
 
-## Architectural Components
-
-### ✅ Summarizer (Global Context Builder)
-
-* Node: `summarizer`
-* Model: **gemini-2.5-flash-lite**
-* Responsibilities:
-
-  * interpret raw issue input
-  * generate structured `issue`
-  * produce `sub_issues_decision: list[DecisionOutput]`
-
-### ✅ Fan‑Out Executor (Orchestrator)
-
-* Implemented as **conditional edge**, not a node
-* Function: `assign_workers`
-* Generates:
-
-  ```python
-  [Send("subtask", payload) ...]
-  ```
-* Each dispatched branch receives isolated `sub_issue`
-
-### ✅ Worker Nodes (Parallel Evaluation)
-
-* Node: `subtask`
-* Model: **gpt‑5‑nano**
-* Execution via:
-
-  ```python
-  Runner.run(starting_agent, input, context)
-  ```
-* Returns:
-
-  ```python
-  {"completed_sub_issues_decision": [DecisionOutput]}
-  ```
-
-### ✅ Fan‑In Aggregator
-
-* Node: `combiner`
-* Input merged automatically because:
-
-  ```python
-  completed_sub_issues_decision: Annotated[list[DecisionOutput], operator.add]
-  ```
-* Produces:
-
-  ```python
-  final_report: CombinedPlan
-  ```
-
----
-
-## State Definition
-
-```python
-class State(TypedDict):
-    retry_count: Annotated[int, add]
-    messages: Annotated[list[BaseMessage], add_messages]
-    issue: str
-    sub_issues_decision: list[DecisionOutput]
-    sub_issue: NotRequired[DecisionOutput]
-    completed_sub_issues_decision: Annotated[list[DecisionOutput], operator.add]
-    final_report: CombinedPlan
-```
-
-### Why this matters
-
-* `operator.add` enables list concatenation during fan‑in
-* `sub_issue` is optional because it only exists inside worker branches
-* messages and retry_count remain compatible with LangGraph execution
-
----
-
-## Execution Flow
+## ⚡ Architectural Overview
 
 ```
 START
   ↓
-summarizer
+entry (thread guard: ended_once check)
   ↓
-assign_workers  (conditional edge)
-  ├─ Send → subtask (worker 1)
-  ├─ Send → subtask (worker 2)
-  ├─ Send → subtask (worker 3)
-  …
-  ↓ (after all workers complete)
-combiner
+summarizer (Gemini 2.5 Flash Lite)
+  ↓
+assign_workers (conditional edge: fan-out)
+  ├─ Send → subtask (reset_vpn_profile)
+  ├─ Send → subtask (restart_sso_session)
+  ├─ Send → subtask (run_connectivity_diagnostics)
+  ├─ Send → subtask (update_internal_record)
+  ├─ Send → subtask (send_notification)
+  └─ Send → subtask (approval_required)
+  ↓ (automatic list concatenation via operator.add)
+combiner (deterministic plan assembly)
   ↓
 END
 ```
 
----
+### Components
 
-## Key Rules and Guarantees
-
-✅ Fan‑out must return Send(), not dict
-✅ Fan‑out must not be registered as a node
-✅ Worker return values must be dicts
-✅ Worker outputs must be lists
-✅ Shared state must be passed into Send payload
-✅ Dynamic instructions must escape braces if using f‑strings
-✅ Null fields like `notes` must be normalized
+| Component | Node / Edge | Model / Technology | Responsibility |
+| :--- | :--- | :--- | :--- |
+| **Thread Guard** | `entry` / `should_continue` | Python Logic | Prevents re-entry on previously completed threads. |
+| **Summarizer** | `summarizer` | **gemini-2.5-flash-lite** | Distills raw incident text into a structured issue summary. |
+| **Fan-Out Orchestrator** | `assign_workers` | Conditional Edge | Dispatches parallel `Send("subtask", ...)` payload branches. |
+| **Subtask Evaluators** | `subtask` | **gpt-5-nano** | Evaluates individual decision viability with dynamic instructions. |
+| **Fan-In Combiner** | `combiner` | Python Logic (Pydantic) | Deterministically merges evaluator outputs into `CombinedPlan`. |
 
 ---
-## 🔍 Example: Dynamic Evaluator Prompt (run_connectivity_diagnostics)
 
-Each evaluator receives a dynamically constructed prompt based on its `decision_id`.  
-Below is an example of the **actual prompt** used for the `run_connectivity_diagnostics` evaluator.
+## 📋 Decision Catalog
 
-### **Evaluator Prompt (Auto-Generated)**
+FlowCheck currently evaluates six specialized operational actions:
 
-```
-as a agent of run_connectivity_diagnostics. 
-You are an automated decision evaluator.
+| Decision ID | Trigger Condition |
+| :--- | :--- |
+| `reset_vpn_profile` | Repeated VPN disconnects, corrupted tunnel profiles, or gateway auth errors. |
+| `restart_sso_session` | Expired tokens, SAML/OAuth session loops, or authentication rejections. |
+| `run_connectivity_diagnostics` | Network dropouts, unreachable microservices, or packet loss indications. |
+| `update_internal_record` | Status updates, onboarding/offboarding events, or CMDB asset drift. |
+| `send_notification` | Escalation alerts, stakeholder communications, or paging on-call staff. |
+| `approval_required` | Compliance policies, elevated production access, or exception approvals. |
 
-Input:
-- decision_id: run_connectivity_diagnostics
-- context: unstructured text containing events, logs, symptoms, actions, or user reports.
+---
 
-Task:
-1. Read and interpret the context.
-2. Based solely on the meaning of the decision_id, determine if action is required:
-   - Triggered by network failures, unreachable services, or packet loss indications.
-3. Return:
-   - decision: true if action is warranted, false otherwise
-   - confidence: 0.0–1.0 expressing certainty
-   - model: name of the model producing the output
-   - notes: concise reasoning (optional) , must be maximum 10 words.
-   - latency_ms: leave empty
+## 📊 State Schema
 
-Output JSON strictly in the following structure:
-
-{
-  "decision_id": "run_connectivity_diagnostics",
-  "decision": true or false,
-  "confidence": 0.0,
-  "model": "gpt-5-nano",
-  "notes": "short rationale",
-  "latency_ms": null
-}
-optimize output token usage without compromising on quality of output.
-Help them with their questions.
+```python
+class State(TypedDict):
+    retry_count: Annotated[int, operator.add]
+    messages: Annotated[list[BaseMessage], add_messages]
+    issue: str
+    sub_issues_decision: tuple[str, ...]
+    sub_issue: NotRequired[str]
+    completed_sub_issues_decision: Annotated[list, operator.add]
+    final_report: CombinedPlan
+    ended_once: bool
 ```
 
----
-
-### **Sample Output**
-
-```json
-{
-  "decision_id": "run_connectivity_diagnostics",
-  "decision": true,
-  "confidence": 0.81,
-  "model": "gpt-5-nano",
-  "notes": "Latency spikes and packet loss reported",
-  "latency_ms": null
-}
-```
-### Notes
-
-- Every evaluator follows the same structure; only decision_id, decision logic description, and sample schema differ.
-- Prompts remain short to minimize cost while preserving clarity.
----
-
-The executor uses these outputs to assemble the final CombinedPlan.
----
-
-## Model Selection Rationale
-
-| Component       | Model                  | Reason                               |
-| --------------- | ---------------------- | ------------------------------------ |
-| summarizer      | **gpt‑2.5‑flash‑lite** | inexpensive global contextualization |
-| subtask workers | **gpt‑5‑nano**         | fast, structured, parallelizable     |
-| final combiner  | inherits context       | purely deterministic merging         |
-
-This yields cost‑efficient scaling because heavy reasoning doesn’t run per worker.
+### Reducer Guarantees
+- `completed_sub_issues_decision` uses `operator.add` to automatically concatenate parallel worker outputs.
+- `sub_issue` is dynamically injected into each worker's isolated payload via `Send()`.
+- Deterministic assembly ensures decisions with `confidence >= 0.6` trigger their respective plan actions.
 
 ---
 
-## Suggested Enhancements
+## 🚀 Quickstart
 
-✅ concurrency limiter (e.g., max 3 workers)
-✅ telemetry: latency, decision rate, disagreement counts
-✅ cost attribution per decision_id
-✅ retry policy only at worker level
+### Prerequisites
+- Python 3.10+
+- Node.js 20.19+ (for documentation preview)
+- API Keys for Google Gemini and OpenAI
 
----
+### 1. Installation
 
-## When to Use This Architecture
-
-Use it if you need:
-✅ independent evaluations per decision type
-✅ consistent aggregation
-✅ heterogeneous model assignment
-✅ parallelism with deterministic merge semantics
-
-Do **not** use if:
-❌ decisions depend on each other
-❌ ordering impacts evaluation
-
----
-# FlowCheck UI (Streamlit Client)
-
-A lightweight UI for interacting with the FlowCheck LangGraph deployment over REST. It supports large incident input, run execution, polling run status, and displaying the final `final_report` from thread state.
-
-## Requirements
 ```bash
+# Clone the repository
+git clone https://github.com/amrit/FlowCheck.git
+cd FlowCheck
+
+# Create and activate virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\Activate.ps1
+
+# Install package dependencies
+pip install -e ".[dev]"
 pip install streamlit requests
 ```
 
-## Configuration
-Edit at top of `app.py`:
-```python
-DEPLOYMENT_URL = "http://localhost:2024"
-ASSISTANT_ID = "agent"
-```
+### 2. Environment Variables
 
-## Run
+Set your provider credentials:
+
 ```bash
-python -m streamlit run app.py
+export GEMINI_API_KEY="your-gemini-key"
+export OPENAI_API_KEY="your-openai-key"
 ```
 
-Open in browser:
+### 3. Running the Server
+
+Start the LangGraph development server:
+
+```bash
+langgraph dev
 ```
-http://localhost:8501
+
+The API service starts at `http://localhost:2024`.
+
+### 4. Running the Streamlit UI
+
+In a separate terminal:
+
+```bash
+python -m streamlit run ui/app.py
 ```
 
-## Features
-- Large text issue input
-- Sends request to LangGraph deployment
-- Shows compact “running” status
-- Fetches thread state after success
-- Displays formatted `final_report`
+Open `http://localhost:8501` to paste incident logs and execute runs.
 
-## Troubleshooting
-| Issue | Fix |
-|-------|-----|
-| 422 on thread create | Add `json={}` body |
-| No final report | Read from thread, not run |
-| Connection failure | Check deployment URL & server |
+### 5. Running Tests
 
-## Optional Enhancements
-- Show node transitions
-- Export report file
-- Use new thread per run
-- Add auth headers
+```bash
+pytest tests/unit_tests/test_combiner.py
+```
 
+---
 
+## 📖 Documentation
 
+Full project documentation is powered by **docs7** in the `docs/` folder:
 
-## License
+```bash
+# Preview docs locally
+npx docs7 dev docs --port 3333
+```
 
-Internal architectural documentation for FlowCheck.
+Navigate to `http://localhost:3333` to browse:
+- **System Architecture**: Detailed state graph transitions and fan-out/fan-in lifecycle.
+- **Decision Evaluators**: Trigger conditions and dynamic prompt contracts.
+- **Data Models**: Pydantic schema specifications and reducer semantics.
+- **UI & Deployment**: Streamlit client details and server operations.
+
+---
+
+## 📄 License
+
+MIT License. See [LICENSE](LICENSE) for details.

@@ -1,0 +1,75 @@
+---
+title: Installation & Setup
+description: Prerequisites, dependency management, environment variables, and verification for FlowCheck.
+---
+
+# Installation & Setup
+
+This guide walks through setting up the FlowCheck runtime environment, configuring required LLM credentials, and verifying installation.
+
+## Prerequisites
+
+- **Python**: Version 3.10 or higher.
+- **Node.js**: Version 20.19 or higher (for documentation preview via docs7).
+- **API Keys**: Access keys for:
+  - Google Gemini API (`GEMINI_API_KEY`)
+  - OpenAI API (`OPENAI_API_KEY`)
+
+## Environment Setup
+
+### 1. Clone & Create Virtual Environment
+
+Create an isolated virtual environment using Python's standard `venv` or `uv`:
+
+```bash
+git clone https://github.com/amrit/FlowCheck.git
+cd FlowCheck
+
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\Activate.ps1
+```
+
+### 2. Install Project Dependencies
+
+Install core dependencies from `pyproject.toml`:
+
+```bash
+pip install -e .
+```
+
+To install development tooling (testing, linting, and type checking):
+
+```bash
+pip install -e ".[dev]"
+```
+
+For UI interactions, install the Streamlit frontend dependencies:
+
+```bash
+pip install streamlit requests
+```
+
+## Provider Credentials
+
+FlowCheck connects to Google Gemini for incident summarization and OpenAI Agents for subtask evaluation. Store your keys in your local environment file (`.env`) or shell session:
+
+```bash
+# Google Gemini API
+export GEMINI_API_KEY="your-google-api-key"
+
+# OpenAI API
+export OPENAI_API_KEY="your-openai-api-key"
+```
+
+> [!IMPORTANT]
+> Never commit actual API keys to source control. FlowCheck loads configurations securely through environment variables and standard client libraries.
+
+## Verification
+
+Validate your local environment by running the test suite:
+
+```bash
+pytest tests/unit_tests/test_combiner.py
+```
+
+If the combiner unit tests execute and pass, your core Pydantic business objects and reducer dependencies are correctly installed.

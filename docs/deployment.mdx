@@ -1,0 +1,70 @@
+---
+title: Deployment & Operations
+description: Running FlowCheck with LangGraph server, configuration specs, container deployment, and test execution.
+---
+
+# Deployment & Operations
+
+This document covers running the FlowCheck agent using the LangGraph server runtime, configuring graph deployments, containerizing with Docker, and running automated test suites.
+
+## LangGraph Server Configuration
+
+The service runtime is configured via `langgraph.json` at the project root:
+
+```json
+{
+  "$schema": "https://langgra.ph/schema.json",
+  "dependencies": ["."],
+  "graphs": {
+    "agent": "./src/flow_agent/graph.py:graph"
+  },
+  "env": ".env",
+  "image_distro": "wolfi"
+}
+```
+
+- **`dependencies`**: Specifies local workspace modules to include in the package path.
+- **`graphs.agent`**: Entry point pointing to the compiled `StateGraph` object in `src/flow_agent/graph.py`.
+- **`image_distro`**: Uses `wolfi` for minimal, secure container environments.
+
+## Running Locally
+
+Launch the LangGraph development server using the CLI:
+
+```bash
+langgraph dev
+```
+
+The API service starts at:
+```text
+http://localhost:2024
+```
+
+To explore the interactive LangGraph Studio interface, open the URL printed in the server startup logs.
+
+## Running the Automated Test Suite
+
+FlowCheck includes automated test suites for verifying combiner aggregation and end-to-end execution:
+
+```bash
+# Run combiner unit tests
+pytest tests/unit_tests/test_combiner.py
+
+# Run with verbose output
+pytest -v tests/unit_tests/test_combiner.py
+```
+
+### Key Test Scenarios Covered
+- **Threshold Disabling**: Low confidence worker evaluations (< 0.6) are excluded from the plan.
+- **Selective Activation**: Worker evaluations meeting or exceeding threshold activate their respective plan flags.
+- **Max Confidence Calculation**: Plan confidence properly reflects the highest confidence among triggered actions.
+- **Empty / Inactive Fallback**: When no worker surpasses threshold, overall plan confidence defaults safely to `0.0`.
+
+## Operational Troubleshooting
+
+| Symptom | Probable Cause | Recommended Resolution |
+| :--- | :--- | :--- |
+| **HTTP 422 on `/threads`** | Missing request body payload | Ensure `POST /threads` sends an empty JSON body `json={}`. |
+| **Missing `final_report`** | Fetching state from run endpoint instead of thread | Query `GET /threads/{thread_id}` rather than the run status endpoint. |
+| **Connection Refused** | LangGraph server not running on port 2024 | Start the server with `langgraph dev` and verify port availability. |
+| **Worker Execution Timeout** | Upstream LLM rate limit or networking latency | Check API quotas and inspect logs in `src/flow_agent/logging_config.py`. |

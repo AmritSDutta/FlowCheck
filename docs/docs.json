@@ -1,0 +1,30 @@
+{
+  "name": "FlowCheck",
+  "theme": "maple",
+  "colors": {
+    "primary": "#009688",
+    "light": "#009688",
+    "dark": "#009688"
+  },
+  "filterSidebar": true,
+  "navigation": {
+    "groups": [
+      {
+        "group": "Getting Started",
+        "pages": ["index", "installation"]
+      },
+      {
+        "group": "Core Architecture",
+        "pages": ["architecture", "evaluators"]
+      },
+      {
+        "group": "Data & Contracts",
+        "pages": ["data-models"]
+      },
+      {
+        "group": "Interfaces & Operations",
+        "pages": ["ui", "deployment"]
+      }
+    ]
+  }
+}
